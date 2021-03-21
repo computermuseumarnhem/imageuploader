@@ -8,7 +8,7 @@ import os
 import logging
 from textwrap import dedent
 
-from telegram import Update
+from telegram import Update, PhotoSize
 from telegram.ext import Updater
 from telegram.ext import CommandHandler
 from telegram.ext import MessageHandler, Filters
@@ -78,14 +78,14 @@ def help(update, context):
             """)
         context.bot.send_message(chat_id=update.effective_chat.id, text=message)
         message = dedent("""\
-            After during a session, every text and photo is stored chronologically. Use the web-app to organise the photos later.
+            During a session, every text and photo is stored chronologically. Use the web-app to organise the photos later.
             """)
         context.bot.send_message(chat_id=update.effective_chat.id, text=message)
 
 
 def msg(update: Update, context: CallbackContext):
     from_user = update.message.from_user
-    logger.info(f"Echo called by {from_user.username}")
+    logger.info(f"Message from {from_user.username}")
     if from_user.username not in context.bot_data.get('active_users', set()):
         message = 'Please start me first'
         context.bot.send_message(chat_id=update.effective_chat.id, text=message)
@@ -94,9 +94,14 @@ def msg(update: Update, context: CallbackContext):
             print(f'@{from_user.username}:{update.message.date}:message:{update.message.text}', file = context.bot_data['database'], flush=True)
         if update.message.caption:
             print(f'@{from_user.username}:{update.message.date}:message:{update.message.caption}', file = context.bot_data['database'], flush=True)
-        for photo in update.message.photo:
-            image = photo.get_file().download(os.path.join(context.bot_data['imagestore'], photo.file_unique_id + '.jpg'))
-            print(f'@{from_user.username}:{update.message.date}:image:{image}', file = context.bot_data['database'], flush=True)
+
+        def photosortkey(p: PhotoSize):
+            return p.height * p.width
+        
+        photo = sorted(update.message.photo, key=photosortkey)[-1]
+        image = photo.get_file().download(os.path.join(context.bot_data['imagestore'], f'{photo.file_unique_id}.jpg'))
+        print(f'@{from_user.username}:{update.message.date}:image:{image}', file = context.bot_data['database'], flush=True)
+
 
 def run():
 
